@@ -39,7 +39,6 @@
     }
 
     // --- scrolling ----------------------------------------------------------
-    var STEP = 60;
     function scroller() {
         // Pick the scrolling root that actually scrolls.
         var el = document.scrollingElement || document.documentElement || document.body;
@@ -49,6 +48,37 @@
     function scrollToTop() { window.scrollTo(0, 0); }
     function scrollToBottom() { window.scrollTo(0, scroller().scrollHeight); }
     function halfPage() { return Math.max(window.innerHeight / 2, 100); }
+
+    // Continuous "hold to scroll". We drive scrolling from our own animation
+    // loop instead of relying on the OS key-repeat, whose initial delay caused
+    // a visible stutter before repeats kicked in. keydown starts the loop,
+    // keyup stops it; a short idle watchdog stops it if a keyup is ever missed.
+    var heldScroll = {};          // key -> { dir: [dx, dy], t: lastSeen }
+    var scrollRAF = null;
+    var SCROLL_SPEED = 20;        // px per frame while held
+    var SCROLL_TAP = 55;          // px for the initial responsive step on a tap
+    var SCROLL_IDLE = 300;        // ms without a keydown before we stop (safety)
+    function scrollLoop() {
+        var now = Date.now(), dx = 0, dy = 0, any = false;
+        for (var k in heldScroll) {
+            if (now - heldScroll[k].t > SCROLL_IDLE) { delete heldScroll[k]; continue; }
+            dx += heldScroll[k].dir[0]; dy += heldScroll[k].dir[1]; any = true;
+        }
+        if (any && (dx || dy)) {
+            window.scrollBy(dx * SCROLL_SPEED, dy * SCROLL_SPEED);
+            scrollRAF = requestAnimationFrame(scrollLoop);
+        } else {
+            scrollRAF = null;
+        }
+    }
+    function startScroll(key, dir) {
+        var fresh = !heldScroll[key];
+        heldScroll[key] = { dir: dir, t: Date.now() };   // refresh on auto-repeat too
+        if (fresh) window.scrollBy(dir[0] * SCROLL_TAP, dir[1] * SCROLL_TAP);
+        if (!scrollRAF) scrollRAF = requestAnimationFrame(scrollLoop);
+    }
+    function stopScroll(key) { delete heldScroll[key]; }
+    function stopAllScroll() { heldScroll = {}; }
 
     // --- editable detection -------------------------------------------------
     function isEditable(el) {
@@ -206,23 +236,25 @@
     // ======================================================================
     //  Find (/ , n , N)
     // ======================================================================
-    var findBar = null, findInput = null, lastQuery = "";
+    var findBar = null, findQuery = "", lastQuery = "";
 
     function enterFind() {
         mode = Mode.FIND;
+        findQuery = "";
         if (!findBar) {
             findBar = document.createElement("div");
+            findBar.id = "__vimium_find";
             findBar.style.cssText =
                 "position:fixed;bottom:0;left:0;z-index:2147483647;background:#1b1b1b;" +
                 "color:#fff;font:13px/1.6 monospace;padding:4px 8px;border-top-right-radius:4px;" +
-                "border:1px solid #555;border-left:none;border-bottom:none;";
-            findBar.innerHTML = "/<input id='__vimium_find' style='background:transparent;border:none;" +
-                "color:#fff;font:inherit;outline:none;width:240px;'>";
+                "border:1px solid #555;border-left:none;border-bottom:none;min-width:240px;";
         }
         if (document.body && findBar.parentNode !== document.body) document.body.appendChild(findBar);
-        findInput = findBar.querySelector("#__vimium_find");
-        findInput.value = "";
-        findInput.focus();
+        updateFindBar();
+    }
+
+    function updateFindBar() {
+        if (findBar) findBar.textContent = "/" + findQuery;
     }
 
     function closeFind() {
@@ -237,16 +269,16 @@
         catch (e) { /* window.find unsupported */ }
     }
 
+    // We build the query from our own key handling rather than focusing a real
+    // <input>. Focusing an input and then removing it left the page without a
+    // focused frame in QtWebEngine, so no key events registered until the view
+    // was re-focused (e.g. by switching tabs) -- which also broke n/N afterward.
     function findKey(e) {
-        if (e.key === "Escape") { closeFind(); e.preventDefault(); return; }
-        if (e.key === "Enter") {
-            var q = findInput.value;
-            closeFind();
-            runFind(q, false);
-            e.preventDefault();
-            return;
-        }
-        // let the input handle every other key normally
+        var k = e.key;
+        if (k === "Escape") { closeFind(); return; }
+        if (k === "Enter") { var q = findQuery; closeFind(); runFind(q, false); return; }
+        if (k === "Backspace") { findQuery = findQuery.slice(0, -1); updateFindBar(); return; }
+        if (k.length === 1) { findQuery += k; updateFindBar(); }
     }
 
     // ======================================================================
@@ -358,10 +390,10 @@
 
         // Single keys -------------------------------------------------------
         switch (k) {
-            case "j": scrollBy(0, STEP); return true;
-            case "k": scrollBy(0, -STEP); return true;
-            case "h": scrollBy(-STEP, 0); return true;
-            case "l": scrollBy(STEP, 0); return true;
+            case "j": startScroll("j", [0, 1]); return true;
+            case "k": startScroll("k", [0, -1]); return true;
+            case "h": startScroll("h", [-1, 0]); return true;
+            case "l": startScroll("l", [1, 0]); return true;
             case "d": scrollBy(0, halfPage()); return true;
             case "u": scrollBy(0, -halfPage()); return true;
             case "G": scrollToBottom(); return true;
@@ -417,7 +449,8 @@
 
         if (mode === Mode.FIND) {
             findKey(e);
-            return; // input keeps native behaviour
+            e.preventDefault(); e.stopPropagation();
+            return;
         }
 
         var active = document.activeElement;
@@ -442,5 +475,12 @@
         }
     }
 
+    // Releasing a held scroll key stops the continuous-scroll loop.
+    function onKeyUp(e) {
+        if (heldScroll[e.key]) stopScroll(e.key);
+    }
+
     document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", stopAllScroll);
 })();

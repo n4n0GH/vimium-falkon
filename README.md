@@ -1,5 +1,8 @@
 # Vimium for Falkon
 
+> **Disclaimer:** This project's code was written by an LLM (AI). Review it
+> before use and run it at your own risk.
+
 A native [Vimium](https://vimium.github.io/)-style keyboard-navigation plugin for the
 [Falkon](https://falkon.org/) web browser, written as a Falkon **Python (PySide6) extension**.
 
