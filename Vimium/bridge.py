@@ -85,6 +85,24 @@ class VimiumBridge(QtCore.QObject):
         if tabs:
             tabs.setCurrentIndex(tabs.count() - 1)
 
+    @Slot()
+    def moveTabLeft(self):
+        tabs = _tabs()
+        if tabs:
+            i = tabs.currentIndex()
+            if i > 0:
+                tabs.moveTab(i, i - 1)
+                tabs.setCurrentIndex(i - 1)
+
+    @Slot()
+    def moveTabRight(self):
+        tabs = _tabs()
+        if tabs:
+            i = tabs.currentIndex()
+            if i < tabs.count() - 1:
+                tabs.moveTab(i, i + 1)
+                tabs.setCurrentIndex(i + 1)
+
     # -- navigation -----------------------------------------------------
     @Slot(str)
     def openInNewTab(self, url):

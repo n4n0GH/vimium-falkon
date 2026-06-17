@@ -318,6 +318,7 @@
         ["H / L", "History back / forward"],
         ["t / x / X", "New tab / close / restore tab"],
         ["J / K", "Previous / next tab"],
+        ["< / >", "Move tab left / right"],
         ["g0 / g$", "First / last tab"],
         ["yt", "Duplicate tab"],
         ["i", "Insert mode (Esc to leave)"],
@@ -429,6 +430,8 @@
             case "X": call("restoreTab"); return true;
             case "J": call("prevTab"); return true;
             case "K": call("nextTab"); return true;
+            case "<": call("moveTabLeft"); return true;
+            case ">": call("moveTabRight"); return true;
             case "p": pasteUrl(false); return true;
             case "P": pasteUrl(true); return true;
             case "i": mode = Mode.INSERT; showHud("-- INSERT -- (Esc to exit)", true); return true;

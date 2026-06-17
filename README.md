@@ -49,6 +49,7 @@ These mirror Vimium's defaults.
 | `t` | New tab |
 | `x` / `X` | Close tab / restore closed tab |
 | `J` / `K` | Previous / next tab |
+| `<` / `>` | Move current tab left / right |
 | `g0` / `g$` | First / last tab |
 | `yt` | Duplicate the current tab |
 | `H` / `L` | History back / forward |
