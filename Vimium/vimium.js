@@ -45,25 +45,43 @@
         return el;
     }
     function scrollBy(x, y) { window.scrollBy({ left: x, top: y, behavior: "auto" }); }
-    function scrollToTop() { window.scrollTo(0, 0); }
-    function scrollToBottom() { window.scrollTo(0, scroller().scrollHeight); }
     function halfPage() { return Math.max(window.innerHeight / 2, 100); }
+    function maxScrollY() {
+        return Math.max(0, scroller().scrollHeight - window.innerHeight);
+    }
+
+    // Animated jump for gg / G, so the movement is visible instead of the page
+    // contents simply snapping into place.
+    var jumpRAF = null;
+    function smoothScrollTo(targetY) {
+        if (jumpRAF) { cancelAnimationFrame(jumpRAF); jumpRAF = null; }
+        var startY = window.scrollY, dist = targetY - startY;
+        if (Math.abs(dist) < 2) { window.scrollTo(0, targetY); return; }
+        var dur = 280, t0 = null;
+        function ease(p) { return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; }
+        function step(ts) {
+            if (t0 === null) t0 = ts;
+            var p = Math.min((ts - t0) / dur, 1);
+            window.scrollTo(0, startY + dist * ease(p));
+            jumpRAF = p < 1 ? requestAnimationFrame(step) : null;
+        }
+        jumpRAF = requestAnimationFrame(step);
+    }
+    function scrollToTop() { smoothScrollTo(0); }
+    function scrollToBottom() { smoothScrollTo(maxScrollY()); }
 
     // Continuous "hold to scroll". We drive scrolling from our own animation
-    // loop instead of relying on the OS key-repeat, whose initial delay caused
-    // a visible stutter before repeats kicked in. keydown starts the loop,
-    // keyup stops it; a short idle watchdog stops it if a keyup is ever missed.
-    var heldScroll = {};          // key -> { dir: [dx, dy], t: lastSeen }
+    // loop rather than the OS key-repeat, whose initial delay caused a stutter
+    // before repeats kicked in. keydown starts the loop; keyup (plus blur /
+    // tab-hide) stops it. Auto-repeat keydowns are ignored -- the loop already
+    // runs continuously -- so there is no pause waiting for the first repeat.
+    var heldScroll = {};          // key -> [dx, dy]
     var scrollRAF = null;
     var SCROLL_SPEED = 20;        // px per frame while held
     var SCROLL_TAP = 55;          // px for the initial responsive step on a tap
-    var SCROLL_IDLE = 300;        // ms without a keydown before we stop (safety)
     function scrollLoop() {
-        var now = Date.now(), dx = 0, dy = 0, any = false;
-        for (var k in heldScroll) {
-            if (now - heldScroll[k].t > SCROLL_IDLE) { delete heldScroll[k]; continue; }
-            dx += heldScroll[k].dir[0]; dy += heldScroll[k].dir[1]; any = true;
-        }
+        var dx = 0, dy = 0, any = false;
+        for (var k in heldScroll) { dx += heldScroll[k][0]; dy += heldScroll[k][1]; any = true; }
         if (any && (dx || dy)) {
             window.scrollBy(dx * SCROLL_SPEED, dy * SCROLL_SPEED);
             scrollRAF = requestAnimationFrame(scrollLoop);
@@ -72,9 +90,9 @@
         }
     }
     function startScroll(key, dir) {
-        var fresh = !heldScroll[key];
-        heldScroll[key] = { dir: dir, t: Date.now() };   // refresh on auto-repeat too
-        if (fresh) window.scrollBy(dir[0] * SCROLL_TAP, dir[1] * SCROLL_TAP);
+        if (heldScroll[key]) return;                 // ignore auto-repeat keydowns
+        heldScroll[key] = dir;
+        window.scrollBy(dir[0] * SCROLL_TAP, dir[1] * SCROLL_TAP);   // responsive first step
         if (!scrollRAF) scrollRAF = requestAnimationFrame(scrollLoop);
     }
     function stopScroll(key) { delete heldScroll[key]; }
@@ -483,4 +501,7 @@
     document.addEventListener("keydown", onKeyDown, true);
     document.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("blur", stopAllScroll);
+    document.addEventListener("visibilitychange", function () {
+        if (document.hidden) stopAllScroll();
+    });
 })();
