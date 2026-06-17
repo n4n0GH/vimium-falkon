@@ -11,6 +11,8 @@ It injects an isolated content script into every page for the in-page features
 browser-level actions (tabs, opening URLs in new tabs, focusing the address bar)
 from Python.
 
+![Vimium for Falkon](screenshot.png)
+
 ## Keyboard shortcuts
 
 These mirror Vimium's defaults.
