@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Vimium
+Comment=Vimium-style keyboard navigation for Falkon (link hints, scrolling, tab control)
+Icon=input-keyboard
+Type=Service
+X-Falkon-Type=Extension/Python
+
+X-Falkon-Author=n4n0
+X-Falkon-Email=bbchunkwol@gmail.com
+X-Falkon-Version=1.0
