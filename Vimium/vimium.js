@@ -240,10 +240,15 @@
             var on = it.label.indexOf(typed) === 0;
             it.marker.style.display = on ? "" : "none";
             if (on) {
-                // highlight the typed portion
+                // Highlight the typed portion. Built with DOM nodes rather than
+                // innerHTML so it works on sites that enforce Trusted Types.
                 var lbl = it.label.toUpperCase();
-                it.marker.innerHTML = "<span style='opacity:.4'>" +
-                    lbl.slice(0, typed.length) + "</span>" + lbl.slice(typed.length);
+                it.marker.textContent = "";
+                var dim = document.createElement("span");
+                dim.style.opacity = ".4";
+                dim.textContent = lbl.slice(0, typed.length);
+                it.marker.appendChild(dim);
+                it.marker.appendChild(document.createTextNode(lbl.slice(typed.length)));
                 matches.push(it);
             }
         });
@@ -331,14 +336,29 @@
             "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2147483647;" +
             "background:#222;color:#eee;font:13px/1.7 monospace;padding:16px 22px;border-radius:8px;" +
             "border:1px solid #555;box-shadow:0 8px 30px rgba(0,0,0,.5);max-height:80vh;overflow:auto;";
-        var html = "<div style='font-weight:bold;margin-bottom:8px;font-size:15px'>Vimium for Falkon</div>" +
-            "<table style='border-collapse:collapse'>";
+        // Built with DOM nodes (no innerHTML) so it works under Trusted Types.
+        var title = document.createElement("div");
+        title.style.cssText = "font-weight:bold;margin-bottom:8px;font-size:15px";
+        title.textContent = "Vimium for Falkon";
+        helpBox.appendChild(title);
+        var table = document.createElement("table");
+        table.style.borderCollapse = "collapse";
         HELP.forEach(function (row) {
-            html += "<tr><td style='color:#ffd866;padding:1px 14px 1px 0;white-space:nowrap'>" +
-                row[0] + "</td><td>" + row[1] + "</td></tr>";
+            var tr = document.createElement("tr");
+            var key = document.createElement("td");
+            key.style.cssText = "color:#ffd866;padding:1px 14px 1px 0;white-space:nowrap";
+            key.textContent = row[0];
+            var desc = document.createElement("td");
+            desc.textContent = row[1];
+            tr.appendChild(key);
+            tr.appendChild(desc);
+            table.appendChild(tr);
         });
-        html += "</table><div style='margin-top:8px;opacity:.6'>Press Esc or ? to close</div>";
-        helpBox.innerHTML = html;
+        helpBox.appendChild(table);
+        var foot = document.createElement("div");
+        foot.style.cssText = "margin-top:8px;opacity:.6";
+        foot.textContent = "Press Esc or ? to close";
+        helpBox.appendChild(foot);
         (document.body || document.documentElement).appendChild(helpBox);
     }
     function closeHelp() { if (helpBox) { helpBox.remove(); helpBox = null; } }
@@ -458,19 +478,19 @@
 
         // Help overlay swallows keys.
         if (helpBox) {
-            if (e.key === "Escape" || e.key === "?") { closeHelp(); e.preventDefault(); e.stopPropagation(); }
+            if (e.key === "Escape" || e.key === "?") { closeHelp(); e.preventDefault(); e.stopImmediatePropagation(); }
             return;
         }
 
         if (mode === Mode.HINTS) {
             hintsKey(e);
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); e.stopImmediatePropagation();
             return;
         }
 
         if (mode === Mode.FIND) {
             findKey(e);
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); e.stopImmediatePropagation();
             return;
         }
 
@@ -492,7 +512,7 @@
 
         if (handleNormal(e)) {
             e.preventDefault();
-            e.stopPropagation();
+            e.stopImmediatePropagation();
         }
     }
 
@@ -501,8 +521,14 @@
         if (heldScroll[e.key]) stopScroll(e.key);
     }
 
-    document.addEventListener("keydown", onKeyDown, true);
-    document.addEventListener("keyup", onKeyUp, true);
+    // Listen on `window` in the capture phase. Our script runs at document
+    // start, so we register before the page's own scripts and therefore run
+    // first among window-capture listeners; combined with the stopImmediate-
+    // Propagation() calls above, this lets us intercept keys before sites
+    // (e.g. YouTube) that grab single-key shortcuts at the window/capture
+    // level and would otherwise swallow our hint/find keystrokes.
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("blur", stopAllScroll);
     document.addEventListener("visibilitychange", function () {
         if (document.hidden) stopAllScroll();
