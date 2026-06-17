@@ -145,3 +145,7 @@ Notes:
   you remove the files above.
 - This leaves your profile/config in `~/.config/falkon` intact. To wipe that too:
   `rm -rf ~/.config/falkon ~/.local/share/falkon`.
+
+## License
+
+Released under the [MIT License](LICENSE).
